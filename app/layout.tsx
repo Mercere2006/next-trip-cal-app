@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Kanit } from "next/font/google";
+import { Prompt } from "next/font/google";
 import "./globals.css";
 
-const kanit = Kanit({
+const prompt = Prompt({
   subsets: ["latin", "thai"],
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
 });
@@ -17,7 +17,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="th"
-      className={`${kanit.className}`}
+      className={`${prompt.className}`}
     >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>

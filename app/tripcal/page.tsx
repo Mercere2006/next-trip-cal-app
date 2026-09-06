@@ -1,241 +1,301 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import tripImage from "@/assets/images/trip.png";
+import { useState, useMemo } from "react";
+import BackgroundLayer from "@/components/tripcal/BackgroundLayer";
+import TripCalHeader from "@/components/tripcal/TripCalHeader";
+import SummaryCards from "@/components/tripcal/SummaryCards";
+import MemberSection, { AVATAR_COLORS } from "@/components/tripcal/MemberSection";
+import FuelSection from "@/components/tripcal/FuelSection";
+import ExpenseSection from "@/components/tripcal/ExpenseSection";
+import SettlementSection from "@/components/tripcal/SettlementSection";
+import {
+  Member,
+  ExpenseItem,
+  FuelConfig,
+  MemberSettlement,
+  TransferSuggestion,
+} from "@/types/tripcal";
+
+const INITIAL_MEMBERS: Member[] = [];
+
+const INITIAL_FUEL: FuelConfig = {
+  distance: 0,
+  consumption: 0,
+  pricePerLiter: 0,
+  paidById: "",
+};
+
+const INITIAL_EXPENSES: ExpenseItem[] = [];
 
 export default function TripCalPage() {
-  const [distance, setDistance] = useState<number>(250);
-  const [fuelConsumption, setFuelConsumption] = useState<number>(14); // กม./ลิตร
-  const [fuelPrice, setFuelPrice] = useState<number>(38); // บาท/ลิตร
-  const [hotelCost, setHotelCost] = useState<number>(1500);
-  const [foodCost, setFoodCost] = useState<number>(1200);
-  const [otherCost, setOtherCost] = useState<number>(500);
-  const [travelers, setTravelers] = useState<number>(2);
+  const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
+  const [fuelConfig, setFuelConfig] = useState<FuelConfig>(INITIAL_FUEL);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>(INITIAL_EXPENSES);
 
-  // คำนวณค่าน้ำมัน
-  const fuelLiters = distance > 0 && fuelConsumption > 0 ? distance / fuelConsumption : 0;
-  const totalFuelCost = fuelLiters * fuelPrice;
+  // 1. คำนวณค่าน้ำมันตามสูตร: (ระยะทางรวม / อัตราสิ้นเปลือง) × ราคาน้ำมันต่อลิตร
+  const fuelLiters = useMemo(() => {
+    if (fuelConfig.distance <= 0 || fuelConfig.consumption <= 0) return 0;
+    return fuelConfig.distance / fuelConfig.consumption;
+  }, [fuelConfig.distance, fuelConfig.consumption]);
 
-  // รวมค่าใช้จ่ายทั้งหมด
-  const totalTripCost = totalFuelCost + hotelCost + foodCost + otherCost;
-  const costPerPerson = travelers > 0 ? totalTripCost / travelers : totalTripCost;
+  const totalFuelCost = useMemo(() => {
+    return fuelLiters * fuelConfig.pricePerLiter;
+  }, [fuelLiters, fuelConfig.pricePerLiter]);
+
+  // 2. คำนวณค่าใช้จ่ายอื่น ๆ รวม
+  const totalOtherExpenses = useMemo(() => {
+    return expenses.reduce((sum, item) => sum + item.amount, 0);
+  }, [expenses]);
+
+  // 3. ค่าใช้จ่ายรวมทั้งทริป = ค่าน้ำมันรวม + ผลรวมค่าใช้จ่ายอื่น ๆ ทุกรายการ
+  const grandTotal = useMemo(() => {
+    return totalFuelCost + totalOtherExpenses;
+  }, [totalFuelCost, totalOtherExpenses]);
+
+  // 4. ค่าเฉลี่ยที่แต่ละคนควรจ่าย = ค่าใช้จ่ายรวมทั้งทริป / จำนวนสมาชิก
+  const fairShare = useMemo(() => {
+    if (members.length === 0) return 0;
+    return grandTotal / members.length;
+  }, [grandTotal, members.length]);
+
+  // สรุปยอดจ่ายจริงของแต่ละคน (ค่าน้ำมัน + รายการอื่น ๆ)
+  const memberExpenseTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    members.forEach((m) => {
+      totals[m.id] = 0;
+    });
+
+    // บวกค่าน้ำมันให้คนจ่าย
+    if (fuelConfig.paidById && totals[fuelConfig.paidById] !== undefined) {
+      totals[fuelConfig.paidById] += totalFuelCost;
+    }
+
+    // บวกค่าใช้จ่ายอื่น ๆ
+    expenses.forEach((e) => {
+      if (totals[e.paidById] !== undefined) {
+        totals[e.paidById] += e.amount;
+      }
+    });
+
+    return totals;
+  }, [members, fuelConfig.paidById, totalFuelCost, expenses]);
+
+  // 5. สรุปว่าใครจ่ายเกินหรือจ่ายขาด
+  const settlements = useMemo<MemberSettlement[]>(() => {
+    return members.map((m) => {
+      const fuelPaid = m.id === fuelConfig.paidById ? totalFuelCost : 0;
+      const otherPaid = expenses
+        .filter((e) => e.paidById === m.id)
+        .reduce((sum, e) => sum + e.amount, 0);
+      const totalPaid = fuelPaid + otherPaid;
+      const balance = totalPaid - fairShare;
+
+      return {
+        memberId: m.id,
+        memberName: m.name,
+        avatarColor: m.avatarColor,
+        fuelPaid,
+        otherPaid,
+        totalPaid,
+        fairShare,
+        balance,
+      };
+    });
+  }, [members, fuelConfig.paidById, totalFuelCost, expenses, fairShare]);
+
+  // 6. คำนวณเส้นทางการโอนเงินเคลียร์ยอด (Debt Settlement Algorithm)
+  const transfers = useMemo<TransferSuggestion[]>(() => {
+    const debtors = settlements
+      .filter((s) => s.balance < -0.01)
+      .map((s) => ({
+        id: s.memberId,
+        name: s.memberName,
+        amount: Math.abs(s.balance),
+      }));
+
+    const creditors = settlements
+      .filter((s) => s.balance > 0.01)
+      .map((s) => ({
+        id: s.memberId,
+        name: s.memberName,
+        amount: s.balance,
+      }));
+
+    const result: TransferSuggestion[] = [];
+    let i = 0;
+    let j = 0;
+
+    while (i < debtors.length && j < creditors.length) {
+      const debtor = debtors[i];
+      const creditor = creditors[j];
+      const amount = Math.min(debtor.amount, creditor.amount);
+
+      if (amount > 0.01) {
+        result.push({
+          fromId: debtor.id,
+          fromName: debtor.name,
+          toId: creditor.id,
+          toName: creditor.name,
+          amount: Math.round(amount * 100) / 100,
+        });
+      }
+
+      debtor.amount -= amount;
+      creditor.amount -= amount;
+
+      if (debtor.amount < 0.01) i++;
+      if (creditor.amount < 0.01) j++;
+    }
+
+    return result;
+  }, [settlements]);
+
+  // Handlers
+  const handleAddMember = (name: string) => {
+    const newId = "m_" + Date.now();
+    const colorIndex = members.length % AVATAR_COLORS.length;
+    const newMember: Member = {
+      id: newId,
+      name,
+      avatarColor: AVATAR_COLORS[colorIndex],
+    };
+    setMembers((prev) => [...prev, newMember]);
+
+    // หากยังไม่ได้เลือกผู้จ่ายค่าน้ำมัน ให้ตั้งคนแรกที่เพิ่มเป็นคนจ่ายเริ่มต้น
+    setFuelConfig((prev) => {
+      if (!prev.paidById) {
+        return { ...prev, paidById: newId };
+      }
+      return prev;
+    });
+  };
+
+  const handleRemoveMember = (id: string) => {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+
+    // หากผู้จ่ายค่าน้ำมันถูกลบ ให้เปลี่ยนเป็นคนแรกที่เหลืออยู่ หรือค่าว่าง
+    setFuelConfig((prev) => {
+      if (prev.paidById === id) {
+        const remaining = members.filter((m) => m.id !== id);
+        return { ...prev, paidById: remaining[0]?.id || "" };
+      }
+      return prev;
+    });
+
+    // หากมีค่าใช้จ่ายของคนที่ถูกลบ ให้เปลี่ยนเป็นคนแรกที่เหลืออยู่ หรือค่าว่าง
+    setExpenses((prev) =>
+      prev.map((e) => {
+        if (e.paidById === id) {
+          const remaining = members.filter((m) => m.id !== id);
+          return { ...e, paidById: remaining[0]?.id || "" };
+        }
+        return e;
+      })
+    );
+  };
+
+  const handleAddExpense = (
+    newExpense: Omit<ExpenseItem, "id" | "createdAt">
+  ) => {
+    const item: ExpenseItem = {
+      ...newExpense,
+      id: "e_" + Date.now(),
+      createdAt: Date.now(),
+    };
+    setExpenses((prev) => [item, ...prev]);
+  };
+
+  const handleRemoveExpense = (id: string) => {
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const handleResetTrip = () => {
+    if (window.confirm("คุณต้องการล้างข้อมูลทริปทั้งหมดและเริ่มใหม่หรือไม่?")) {
+      setMembers([]);
+      setFuelConfig({
+        distance: 0,
+        consumption: 0,
+        pricePerLiter: 0,
+        paidById: "",
+      });
+      setExpenses([]);
+    }
+  };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between overflow-x-hidden text-slate-700 bg-gradient-to-b from-sky-50 via-white to-sky-50">
-      {/* Background decoration */}
-      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-sky-200/30 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-100/40 rounded-full blur-3xl" />
-      </div>
+    <div className="relative min-h-screen w-full flex flex-col justify-between overflow-x-hidden text-slate-700">
+      {/* 1. Background layer with soft light-blue / white theme */}
+      <BackgroundLayer />
 
-      {/* Header */}
-      <header className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 z-10">
-        <div className="flex items-center justify-between py-3 px-5 rounded-2xl bg-white/80 backdrop-blur-md border border-sky-100 shadow-xs">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700 hover:text-blue-800 transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-4 h-4"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            <span>กลับหน้าหลัก</span>
-          </Link>
+      {/* 2. Top Header with Back to Home Link & Branding */}
+      <TripCalHeader onResetTrip={handleResetTrip} />
 
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-sky-500 text-white flex items-center justify-center text-xs font-bold">
-              TC
-            </div>
-            <span className="font-bold text-slate-800 text-sm sm:text-base">ระบบคำนวณค่าใช้จ่ายการเดินทาง</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8 z-10">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800">
-            คำนวณและประเมินงบประมาณการเดินทาง
+      {/* 3. Main Content Container */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 z-10 space-y-6 sm:space-y-8">
+        {/* Page Title & Intro */}
+        <div className="text-center sm:text-left space-y-1">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-800 tracking-tight">
+            คำนวณค่าทริป & แชร์ค่าใช้จ่าย (Money Shared)
           </h1>
-          <p className="text-slate-500 text-sm sm:text-base mt-1.5">
-            ปรับเปลี่ยนข้อมูลด้านล่างเพื่อดูงบประมาณรวมและค่าใช้จ่ายเฉลี่ยต่อคนแบบเรียลไทม์
+          <p className="text-xs sm:text-sm text-slate-500 font-normal">
+            กรอกข้อมูลระยะทาง อัตราสิ้นเปลือง และค่าใช้จ่ายอื่น ๆ
+            ระบบจะหารเฉลี่ยและสรุปยอดจ่ายเกิน/จ่ายขาดให้อัตโนมัติ
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Inputs Section */}
-          <div className="lg:col-span-7 bg-white/85 backdrop-blur-md border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-xl shadow-sky-900/5 space-y-6">
-            <h2 className="text-lg font-bold text-slate-800 border-b border-sky-100 pb-3 flex items-center gap-2">
-              <span>🚗</span> ข้อมูลการเดินทางและยานพาหนะ
-            </h2>
+        {/* 4. Summary Cards (Outputs specified in prompt) */}
+        <SummaryCards
+          totalFuelCost={totalFuelCost}
+          fuelLiters={fuelLiters}
+          totalOtherExpenses={totalOtherExpenses}
+          otherExpensesCount={expenses.length}
+          grandTotal={grandTotal}
+          fairShare={fairShare}
+          memberCount={members.length}
+        />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  ระยะทางรวมไป-กลับ (กิโลเมตร)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={distance}
-                  onChange={(e) => setDistance(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 font-medium text-sm transition-all"
-                />
-              </div>
+        {/* 5. สมาชิกในทริป (รายชื่อสมาชิกเอาไว้ข้างบนเหมือนเดิม) */}
+        <MemberSection
+          members={members}
+          onAddMember={handleAddMember}
+          onRemoveMember={handleRemoveMember}
+          memberExpenseTotals={memberExpenseTotals}
+        />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  อัตราสิ้นเปลือง (กิโลเมตร / ลิตร)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={fuelConsumption}
-                  onChange={(e) => setFuelConsumption(Math.max(1, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 font-medium text-sm transition-all"
-                />
-              </div>
+        {/* 6. ค่าน้ำมันจากระยะทาง (Row Layout: กรอกข้อมูล 4 แถวเรียงลงมาทางซ้าย ผลลัพธ์สมดุลทางขวา) */}
+        <FuelSection
+          fuelConfig={fuelConfig}
+          onChangeFuel={setFuelConfig}
+          members={members}
+        />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  ราคาน้ำมันเฉลี่ย (บาท / ลิตร)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={fuelPrice}
-                  onChange={(e) => setFuelPrice(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 font-medium text-sm transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  จำนวนผู้ร่วมเดินทาง (คน)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={travelers}
-                  onChange={(e) => setTravelers(Math.max(1, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 font-medium text-sm transition-all"
-                />
-              </div>
-            </div>
-
-            <h2 className="text-lg font-bold text-slate-800 border-b border-sky-100 pb-3 pt-2 flex items-center gap-2">
-              <span>🏨</span> ค่าใช้จ่ายอื่นๆ ในทริป
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  ค่าที่พักรวม (บาท)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={hotelCost}
-                  onChange={(e) => setHotelCost(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 font-medium text-sm transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  ค่าอาหาร/เครื่องดื่ม (บาท)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={foodCost}
-                  onChange={(e) => setFoodCost(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 font-medium text-sm transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  ค่ากิจกรรม/อื่นๆ (บาท)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={otherCost}
-                  onChange={(e) => setOtherCost(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-sky-200 bg-sky-50/40 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 font-medium text-sm transition-all"
-                />
-              </div>
-            </div>
+        {/* 7. ค่าใช้จ่ายอื่น ๆ และสรุปยอดเคลียร์เงิน */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+          {/* Left Column: รายการค่าใช้จ่ายอื่น ๆ (lg:col-span-6) */}
+          <div className="lg:col-span-6 space-y-6 sm:space-y-8">
+            <ExpenseSection
+              expenses={expenses}
+              members={members}
+              onAddExpense={handleAddExpense}
+              onRemoveExpense={handleRemoveExpense}
+            />
           </div>
 
-          {/* Results Summary Card */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            <div className="rounded-3xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 sm:p-8 text-white shadow-xl shadow-blue-500/20">
-              <div className="flex items-center justify-between border-b border-white/20 pb-4 mb-4">
-                <span className="text-sm font-medium text-sky-100">สรุปงบประมาณรวม</span>
-                <span className="text-xs bg-white/20 px-2.5 py-1 rounded-full">{travelers} ผู้เดินทาง</span>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-sm text-sky-100">
-                  <span>ค่าน้ำมัน ({fuelLiters.toFixed(1)} ลิตร)</span>
-                  <span className="font-semibold text-white">{totalFuelCost.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท</span>
-                </div>
-                <div className="flex justify-between text-sm text-sky-100">
-                  <span>ค่าที่พัก</span>
-                  <span className="font-semibold text-white">{hotelCost.toLocaleString("th-TH")} บาท</span>
-                </div>
-                <div className="flex justify-between text-sm text-sky-100">
-                  <span>ค่าอาหารและเครื่องดื่ม</span>
-                  <span className="font-semibold text-white">{foodCost.toLocaleString("th-TH")} บาท</span>
-                </div>
-                <div className="flex justify-between text-sm text-sky-100">
-                  <span>ค่าใช้จ่ายเบ็ดเตล็ด</span>
-                  <span className="font-semibold text-white">{otherCost.toLocaleString("th-TH")} บาท</span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-white/20 space-y-3">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-sm font-light text-sky-100">ยอดรวมทั้งสิ้น:</span>
-                  <span className="text-3xl font-extrabold">{totalTripCost.toLocaleString("th-TH", { maximumFractionDigits: 0 })} <span className="text-lg font-normal">บาท</span></span>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/15 backdrop-blur-sm flex justify-between items-center">
-                  <span className="text-xs sm:text-sm font-medium">เฉลี่ยจ่ายคนละ:</span>
-                  <span className="text-xl sm:text-2xl font-black text-amber-300">
-                    {costPerPerson.toLocaleString("th-TH", { maximumFractionDigits: 0 })} <span className="text-xs sm:text-sm text-white font-normal">บาท/คน</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Trip Mascot Card */}
-            <div className="flex items-center gap-4 p-5 rounded-2xl bg-white/80 border border-sky-100 shadow-xs">
-              <div className="w-16 h-16 shrink-0 relative">
-                <Image src={tripImage} alt="Trip Icon" className="object-contain" priority />
-              </div>
-              <div className="text-xs sm:text-sm text-slate-600">
-                <p className="font-semibold text-slate-800">พร้อมออกเดินทางหรือยัง?</p>
-                <p className="text-slate-500 mt-0.5">วางแผนงบประมาณล่วงหน้า ช่วยให้ท่องเที่ยวได้อย่างสบายใจและคุมค่าใช้จ่ายได้อยู่หมัด</p>
-              </div>
-            </div>
+          {/* Right Column: สรุปว่าใครจ่ายเกินหรือจ่ายขาด (lg:col-span-6) */}
+          <div className="lg:col-span-6 space-y-6 sm:space-y-8 lg:sticky lg:top-6">
+            <SettlementSection
+              settlements={settlements}
+              transfers={transfers}
+              grandTotal={grandTotal}
+              fairShare={fairShare}
+            />
           </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 text-center text-xs text-slate-400 z-10">
-        ระบบคำนวณค่าใช้จ่ายการเดินทาง (TripCal) • หน้าเพจ TripCal
+      {/* 6. Footer */}
+      <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-xs text-slate-400 z-10">
+        <p>© {new Date().getFullYear()} เว็บคำนวณค่าใช้จ่ายการเดินทาง (Trip Calculator - Money Shared)</p>
       </footer>
     </div>
   );

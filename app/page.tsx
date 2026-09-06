@@ -48,10 +48,7 @@ export default function HomePage() {
           </div>
           <div>
             <span className="text-xl font-bold bg-gradient-to-r from-sky-800 to-blue-950 bg-clip-text text-transparent">
-              TripCal
-            </span>
-            <span className="hidden sm:inline-block ml-2.5 text-xs font-medium text-sky-700 bg-sky-100/80 border border-sky-200/60 px-2.5 py-0.5 rounded-full">
-              ระบบคำนวณการเดินทาง
+              Trip Calculator
             </span>
           </div>
         </div>
@@ -64,10 +61,7 @@ export default function HomePage() {
             {/* Left Column: Text Information & Button */}
             <div className="lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6">
               {/* Feature Pill Badge */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100/80 backdrop-blur-sm border border-sky-200/80 text-sky-900 text-xs sm:text-sm font-medium shadow-xs">
-                <span className="flex h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
-                <span>วางแผนงบประมาณทริปท่องเที่ยวอย่างมั่นใจ</span>
-              </div>
+
 
               {/* Primary Title Required by User */}
               <div className="space-y-3">
@@ -78,32 +72,33 @@ export default function HomePage() {
                   </span>
                 </h1>
                 <p className="text-base sm:text-lg md:text-xl text-slate-600 font-normal max-w-xl leading-relaxed">
-                  จัดการงบประมาณทริปในฝันของคุณได้อย่างง่ายดาย คำนวณค่าน้ำมัน ค่าเดินทาง
-                  ค่าที่พัก และค่าอาหารได้อย่างแม่นยำ ครบ จบ ในที่เดียว
+                  จัดการงบประมาณทริปในฝันของคุณได้อย่างง่ายดาย คำนวณค่าน้ำมัน
+                  ค่าเดินทาง ค่าที่พัก และค่าอาหารได้อย่างแม่นยำ ครบ จบ
+                  ในที่เดียว
                 </p>
               </div>
 
               {/* Feature Highlights List */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg pt-1">
-                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-100/50 backdrop-blur-sm border border-sky-200/50 text-slate-700 text-sm">
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-200/60 backdrop-blur-sm border border-sky-300/50 text-slate-700 text-sm">
                   <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-sky-500/15 text-sky-700 shrink-0">
                     ⛽
                   </div>
                   <span className="font-medium">คำนวณค่าน้ำมันตามระยะทาง</span>
                 </div>
-                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-100/50 backdrop-blur-sm border border-sky-200/50 text-slate-700 text-sm">
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-200/60 backdrop-blur-sm border border-sky-300/50 text-slate-700 text-sm">
                   <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-sky-500/15 text-sky-700 shrink-0">
                     🏨
                   </div>
                   <span className="font-medium">รวมค่าที่พักและค่าอาหาร</span>
                 </div>
-                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-100/50 backdrop-blur-sm border border-sky-200/50 text-slate-700 text-sm">
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-200/60 backdrop-blur-sm border border-sky-300/50 text-slate-700 text-sm">
                   <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-sky-500/15 text-sky-700 shrink-0">
                     👥
                   </div>
                   <span className="font-medium">หารเฉลี่ยตามจำนวนคน</span>
                 </div>
-                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-100/50 backdrop-blur-sm border border-sky-200/50 text-slate-700 text-sm">
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-sky-200/60 backdrop-blur-sm border border-sky-300/50 text-slate-700 text-sm">
                   <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-sky-500/15 text-sky-700 shrink-0">
                     📊
                   </div>
@@ -115,7 +110,7 @@ export default function HomePage() {
               <div className="pt-4 w-full sm:w-auto flex flex-col sm:flex-row items-center gap-4">
                 <Link
                   href="/tripcal"
-                  className="group relative w-full sm:w-auto inline-flex items-center justify-center gap-3 px-9 py-4 text-base sm:text-lg font-semibold text-white rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-600 hover:via-blue-700 hover:to-indigo-700 shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-sky-300"
+                  className="group relative w-full sm:w-auto inline-flex items-center justify-center gap-3 px-40 py-4 text-base sm:text-lg font-semibold text-white rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-600 hover:via-blue-700 hover:to-indigo-700 shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-sky-300"
                 >
                   <span>เริ่มต้นคำนวณค่าใช้จ่าย</span>
                   <svg
@@ -133,10 +128,6 @@ export default function HomePage() {
                     />
                   </svg>
                 </Link>
-
-                <span className="text-xs sm:text-sm text-slate-500 font-medium">
-                  ✨ ฟรี 100% ใช้งานได้ทันที
-                </span>
               </div>
             </div>
 
@@ -158,20 +149,6 @@ export default function HomePage() {
           </div>
         </div>
       </main>
-
-      {/* 4. Minimalist Footer */}
-      <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 z-10">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-500 text-center sm:text-left">
-          <p>© {new Date().getFullYear()} เว็บคำนวณค่าใช้จ่ายการเดินทาง (TripCal). สงวนลิขสิทธิ์</p>
-          <div className="flex items-center gap-4 text-sky-700">
-            <Link href="/tripcal" className="hover:underline">
-              เริ่มคำนวณทริป
-            </Link>
-            <span>•</span>
-            <span className="text-slate-400">โทนสีฟ้า-ขาว สบายตา สะอาดตา</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
